@@ -1,0 +1,381 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0,user-scalable=no">
+<title>Diagnóstico</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+:root{
+  --bg:#080c14;--card:#111827;--border:#1e293b;
+  --txt:#e2e8f0;--txt2:#94a3b8;--txt3:#64748b;
+  --green:#00e676;--green-g:0 0 18px #00e67688,0 0 40px #00e67633;
+  --red:#ff1744;--red-g:0 0 18px #ff174488,0 0 40px #ff174433;
+  --blue:#3b82f6;--amber:#f59e0b;
+}
+body{background:var(--bg);color:var(--txt);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
+  min-height:100vh;min-height:100dvh;padding:12px;overflow-x:hidden;-webkit-tap-highlight-color:transparent}
+.hdr{display:flex;align-items:center;justify-content:space-between;padding:10px 14px;
+  background:var(--card);border:1px solid var(--border);border-radius:12px;margin-bottom:12px}
+.hdr h1{font-size:15px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase}
+.hdr .sub{font-size:10px;color:var(--txt3);letter-spacing:2px;margin-top:2px}
+.ws-dot{width:10px;height:10px;border-radius:50%;flex-shrink:0;transition:background .3s,box-shadow .3s}
+.ws-dot.on{background:var(--green);box-shadow:var(--green-g)}
+.ws-dot.off{background:var(--red);box-shadow:var(--red-g);animation:blink 1.2s infinite}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:.3}}
+
+.cols{display:flex;gap:8px;margin-bottom:6px;padding:0 4px}
+.col-lbl{flex:1;text-align:center;font-size:10px;font-weight:600;letter-spacing:1.5px;
+  color:var(--txt3);text-transform:uppercase;padding:6px 0}
+.col-lbl span{display:block;font-size:8px;font-weight:400;margin-top:1px;letter-spacing:.5px;color:var(--txt3);opacity:.7}
+
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px}
+.sensor{background:var(--card);border:1px solid var(--border);border-radius:11px;padding:10px 8px;
+  display:flex;flex-direction:column;align-items:center;gap:4px;transition:border-color .2s,box-shadow .25s}
+.sensor.libre{border-color:#00e67644;box-shadow:inset 0 0 20px #00e67611,var(--green-g)}
+.sensor.bloq{border-color:#ff174444;box-shadow:inset 0 0 20px #ff174411,var(--red-g)}
+
+.led{width:38px;height:38px;border-radius:50%;transition:background .15s,box-shadow .2s;position:relative}
+.led::after{content:'';position:absolute;top:5px;left:8px;width:14px;height:8px;border-radius:50%;
+  background:rgba(255,255,255,.22);filter:blur(2px)}
+.libre .led{background:radial-gradient(circle at 40% 38%,#69f0ae,#00c853);box-shadow:var(--green-g)}
+.bloq .led{background:radial-gradient(circle at 40% 38%,#ff5252,#d50000);box-shadow:var(--red-g)}
+
+.s-id{font-size:11px;font-weight:700;letter-spacing:1px}
+.s-pin{font-size:8px;color:var(--txt3);font-family:monospace}
+.s-state{font-size:8px;font-weight:600;letter-spacing:1.5px;text-transform:uppercase;
+  padding:2px 8px;border-radius:5px;transition:background .2s,color .2s}
+.libre .s-state{background:#00e67618;color:var(--green)}
+.bloq .s-state{background:#ff174418;color:var(--red)}
+
+.raw-ind{display:flex;gap:3px;align-items:center;margin-top:1px}
+.raw-ind .dot{width:5px;height:5px;border-radius:50%;transition:background .15s}
+.raw-ind .lbl{font-size:7px;color:var(--txt3)}
+
+.panel{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:12px 14px;margin-bottom:10px}
+.panel-title{font-size:9px;color:var(--txt3);letter-spacing:2px;text-transform:uppercase;margin-bottom:8px;font-weight:600}
+
+.fsm-row{display:flex;align-items:center;gap:10px;margin-bottom:10px}
+.fsm-badge{font-size:13px;font-weight:700;letter-spacing:1px;padding:5px 14px;
+  border-radius:8px;background:#3b82f618;color:var(--blue);border:1px solid #3b82f633}
+
+.cnt-row{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.cnt{text-align:center}
+.cnt .v{font-size:22px;font-weight:700;font-variant-numeric:tabular-nums}
+.cnt .l{font-size:9px;color:var(--txt3);letter-spacing:1.5px;text-transform:uppercase;margin-top:2px}
+.cnt.up .v{color:var(--green)}
+.cnt.dn .v{color:var(--amber)}
+.cnt.bk .v{color:var(--red)}
+
+.timer-bar{background:var(--card);border:1px solid var(--border);border-radius:10px;padding:10px 14px;
+  display:flex;align-items:center;gap:10px;margin-bottom:10px}
+.timer-track{flex:1;height:6px;background:#1e293b;border-radius:3px;overflow:hidden}
+.timer-fill{height:100%;background:linear-gradient(90deg,var(--blue),#60a5fa);border-radius:3px;
+  transition:width .5s linear}
+.timer-txt{font-size:12px;font-weight:600;font-variant-numeric:tabular-nums;min-width:44px;text-align:right}
+
+.cfg-toggle{display:flex;align-items:center;justify-content:space-between;cursor:pointer;-webkit-user-select:none;user-select:none}
+.cfg-toggle .arrow{font-size:10px;color:var(--txt3);transition:transform .2s}
+.cfg-toggle.open .arrow{transform:rotate(180deg)}
+.cfg-body{max-height:0;overflow:hidden;transition:max-height .3s ease}
+.cfg-body.open{max-height:400px}
+.cfg-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:4px 10px;margin-top:8px}
+.cfg-item{font-size:10px;font-family:monospace;color:var(--txt2);padding:2px 0}
+.cfg-item b{color:var(--txt);font-weight:600}
+
+.dcn{text-align:center;padding:40px 20px;color:var(--txt3)}
+.dcn .ico{font-size:32px;margin-bottom:10px}
+.dcn p{font-size:12px}
+
+.rst-btn{background:none;border:1px solid var(--border);color:var(--txt2);font-size:10px;
+  font-weight:600;letter-spacing:1.5px;text-transform:uppercase;padding:7px 20px;
+  border-radius:8px;cursor:pointer;transition:background .2s,border-color .2s,color .2s;
+  -webkit-tap-highlight-color:transparent}
+.rst-btn:active{background:#ff174422;border-color:var(--red);color:var(--red)}
+
+.rtc-bar{background:var(--card);border:1px solid var(--border);border-radius:10px;padding:8px 14px;
+  display:flex;align-items:center;justify-content:space-between;margin-bottom:10px}
+.rtc-bar .rtc-icon{font-size:14px;color:var(--txt3);margin-right:8px}
+.rtc-bar .rtc-label{font-size:9px;color:var(--txt3);letter-spacing:1.5px;text-transform:uppercase;margin-right:8px}
+.rtc-bar .rtc-val{font-size:13px;font-weight:700;font-variant-numeric:tabular-nums;color:var(--txt);letter-spacing:.5px}
+.rtc-bar .rtc-na{font-size:11px;color:var(--txt3);font-style:italic}
+
+.sync-btn{background:none;border:1px solid var(--border);color:var(--txt3);font-size:8px;
+  font-weight:600;letter-spacing:1.5px;text-transform:uppercase;padding:4px 10px;
+  border-radius:6px;cursor:pointer;transition:background .2s,border-color .2s,color .2s;
+  -webkit-tap-highlight-color:transparent;display:none}
+.sync-btn:active{background:#3b82f622;border-color:var(--blue);color:var(--blue)}
+.sync-btn.ok{background:#00e67618;border-color:var(--green);color:var(--green)}
+.sync-btn.err{background:#ff174418;border-color:var(--red);color:var(--red)}
+.sync-btn.visible{display:inline-block}
+</style>
+</head>
+<body>
+
+<div class="hdr">
+  <div><h1 id="hdrTitle">Contador</h1><div class="sub">Modo Diagnóstico</div></div>
+  <div class="ws-dot off" id="wsDot"></div>
+</div>
+
+<div id="mainUI" style="display:none">
+  <div class="rtc-bar">
+    <div style="display:flex;align-items:center">
+      <span class="rtc-icon">🕐</span>
+      <span class="rtc-label">RTC</span>
+    </div>
+    <div style="display:flex;align-items:center;gap:8px">
+      <span class="rtc-val" id="rtcVal">---</span>
+      <button class="sync-btn" id="syncBtn" onclick="syncRTC()">SYNC</button>
+    </div>
+  </div>
+
+  <div class="cols">
+    <div class="col-lbl">Col B<span>Bajada primero</span></div>
+    <div class="col-lbl">Col A<span>Subida primero</span></div>
+  </div>
+
+  <div class="grid" id="sGrid"></div>
+
+  <div class="panel">
+    <div class="fsm-row">
+      <span class="panel-title" style="margin:0">Estado FSM</span>
+      <span class="fsm-badge" id="fsmBadge">---</span>
+    </div>
+    <div class="cnt-row">
+      <div class="cnt up"><div class="v" id="cSub">0</div><div class="l">Subidas</div></div>
+      <div class="cnt dn"><div class="v" id="cBaj">0</div><div class="l">Bajadas</div></div>
+      <div class="cnt bk"><div class="v" id="cBlk">0</div><div class="l">Bloqueos</div></div>
+    </div>
+    <div style="text-align:center;margin-top:10px;padding-top:8px;border-top:1px solid var(--border)">
+      <button class="rst-btn" onclick="resetCounters()">Reiniciar Conteo</button>
+    </div>
+  </div>
+
+  <div class="timer-bar">
+    <span style="font-size:9px;color:var(--txt3);letter-spacing:1px;text-transform:uppercase">Auto-salida</span>
+    <div class="timer-track"><div class="timer-fill" id="tmFill" style="width:100%"></div></div>
+    <span class="timer-txt" id="tmTxt">10:00</span>
+  </div>
+
+  <div class="panel">
+    <div class="cfg-toggle" id="cfgToggle" onclick="toggleCfg()">
+      <span class="panel-title" style="margin:0">Configuración</span>
+      <span class="arrow">▼</span>
+    </div>
+    <div class="cfg-body" id="cfgBody">
+      <div class="cfg-grid" id="cfgGrid"></div>
+    </div>
+  </div>
+</div>
+
+<div class="dcn" id="dcnMsg">
+  <div class="ico">⟳</div>
+  <p>Conectando al contador...</p>
+</div>
+
+<script>
+(function(){
+  var PINS=[36,35,38,37,40,39,42,41];
+  var TOTAL_S=600;
+  var ws=null, retryT=null, connected=false;
+  var pid=0; // 0=unknown, 1=P1, 2=P2
+
+  // Build sensor grid
+  var grid=document.getElementById('sGrid');
+  for(var row=3;row>=0;row--){
+    for(var col=1;col>=0;col--){
+      var idx=row*2+col;
+      var d=document.createElement('div');
+      d.className='sensor';
+      d.id='s'+idx;
+      d.innerHTML='<div class="led"></div>'+
+        '<div class="s-id">S'+idx+'</div>'+
+        '<div class="s-pin">GPIO '+PINS[idx]+'</div>'+
+        '<div class="s-state">---</div>'+
+        '<div class="raw-ind"><span class="dot" id="raw'+idx+'"></span><span class="lbl">RAW</span></div>';
+      grid.appendChild(d);
+    }
+  }
+
+  function connWS(){
+    if(ws&&(ws.readyState===0||ws.readyState===1))return;
+    try{
+      ws=new WebSocket('ws://'+location.host+'/ws');
+    }catch(e){schedRetry();return}
+    ws.onopen=function(){
+      connected=true;
+      document.getElementById('wsDot').className='ws-dot on';
+      document.getElementById('mainUI').style.display='';
+      document.getElementById('dcnMsg').style.display='none';
+    };
+    ws.onclose=function(){onDcn()};
+    ws.onerror=function(){onDcn()};
+    ws.onmessage=function(ev){
+      try{var d=JSON.parse(ev.data)}catch(e){return}
+      if(d.type==='cfg'){handleCfg(d);return}
+      if(d.rtc_sync!==undefined){handleSyncResp(d.rtc_sync);return}
+      updateSensors(d);
+      updateCounters(d);
+      updateTimer(d);
+      updateFSM(d);
+      updateRTC(d);
+    };
+  }
+
+  function onDcn(){
+    connected=false;
+    document.getElementById('wsDot').className='ws-dot off';
+    schedRetry();
+  }
+  function schedRetry(){
+    if(retryT)return;
+    retryT=setTimeout(function(){retryT=null;connWS()},1500);
+  }
+
+  function handleCfg(d){
+    // Recibir pid del firmware
+    if(d.pid!==undefined){
+      pid=d.pid;
+      document.getElementById('hdrTitle').textContent='Contador P'+pid;
+      document.title='P'+pid+' Diagnóstico';
+      // Mostrar botón SYNC solo si P1 (tiene RTC)
+      var syncBtn=document.getElementById('syncBtn');
+      if(pid===1){
+        syncBtn.classList.add('visible');
+        // Auto-sync RTC al conectar
+        sendRTCSync();
+      } else {
+        syncBtn.classList.remove('visible');
+      }
+    }
+    showCfg(d);
+  }
+
+  function updateSensors(d){
+    if(!d.s)return;
+    for(var i=0;i<8;i++){
+      var el=document.getElementById('s'+i);
+      var st=d.s[i];
+      el.className='sensor '+(st?'bloq':'libre');
+      el.querySelector('.s-state').textContent=st?'BLOQ':'LIBRE';
+      var rawDot=document.getElementById('raw'+i);
+      if(d.r){
+        var rv=d.r[i];
+        rawDot.style.background=rv?'var(--red)':'var(--green)';
+      }
+    }
+  }
+
+  function updateCounters(d){
+    if(d.u!==undefined)document.getElementById('cSub').textContent=d.u;
+    if(d.d!==undefined)document.getElementById('cBaj').textContent=d.d;
+    if(d.b!==undefined)document.getElementById('cBlk').textContent=d.b;
+  }
+
+  window.resetCounters=function(){
+    if(ws&&ws.readyState===1){
+      ws.send('RST');
+      document.getElementById('cSub').textContent='0';
+      document.getElementById('cBaj').textContent='0';
+      document.getElementById('cBlk').textContent='0';
+    }
+  };
+
+  function updateTimer(d){
+    if(d.t===undefined)return;
+    var s=d.t;if(s<0)s=0;
+    var mm=Math.floor(s/60),ss=s%60;
+    document.getElementById('tmTxt').textContent=(mm<10?'0':'')+mm+':'+(ss<10?'0':'')+ss;
+    var pct=(s/TOTAL_S)*100;
+    document.getElementById('tmFill').style.width=pct+'%';
+    if(pct<20)document.getElementById('tmFill').style.background='linear-gradient(90deg,var(--red),var(--amber))';
+    else document.getElementById('tmFill').style.background='linear-gradient(90deg,var(--blue),#60a5fa)';
+  }
+
+  function updateFSM(d){
+    if(!d.f)return;
+    var b=document.getElementById('fsmBadge');
+    b.textContent=d.f;
+    if(d.f==='REPOSO'){b.style.background='#3b82f618';b.style.color='var(--blue)';b.style.borderColor='#3b82f633'}
+    else if(d.f.indexOf('SUB')>=0){b.style.background='#00e67618';b.style.color='var(--green)';b.style.borderColor='#00e67633'}
+    else if(d.f.indexOf('BAJ')>=0){b.style.background='#f59e0b18';b.style.color='var(--amber)';b.style.borderColor='#f59e0b33'}
+    else{b.style.background='#a855f718';b.style.color='#a855f7';b.style.borderColor='#a855f733'}
+  }
+
+  function updateRTC(d){
+    var el=document.getElementById('rtcVal');
+    if(d.rtc){
+      el.textContent=d.rtc;
+      el.className='rtc-val';
+    } else if(pid===2){
+      el.textContent='Sin RTC';
+      el.className='rtc-val rtc-na';
+    }
+  }
+
+  function buildRTCString(){
+    var n=new Date();
+    var p=function(v){return v<10?'0'+v:''+v};
+    return ''+n.getFullYear()+p(n.getMonth()+1)+p(n.getDate())+
+           p(n.getHours())+p(n.getMinutes())+p(n.getSeconds());
+  }
+
+  function sendRTCSync(){
+    if(ws&&ws.readyState===1&&pid===1){
+      var cmd='SETRTC:'+buildRTCString();
+      ws.send(cmd);
+      var btn=document.getElementById('syncBtn');
+      btn.textContent='...';
+      btn.className='sync-btn visible';
+    }
+  }
+
+  window.syncRTC=function(){
+    sendRTCSync();
+  };
+
+  function handleSyncResp(status){
+    var btn=document.getElementById('syncBtn');
+    if(status==='ok'){
+      btn.textContent='\u2713 OK';
+      btn.className='sync-btn visible ok';
+    } else {
+      btn.textContent='\u2717 ERR';
+      btn.className='sync-btn visible err';
+    }
+    setTimeout(function(){
+      btn.textContent='SYNC';
+      btn.className='sync-btn visible';
+    },2500);
+  }
+
+  function showCfg(d){
+    var g=document.getElementById('cfgGrid');
+    g.innerHTML='';
+    // P1 incluye CAM, P2 no
+    var keys=(pid===1)?
+      ['LS','MIN','MAX','REF','SIM','HOLD','DET','CONFU','CONFD','STU','STD','TB','CAM','CH']:
+      ['LS','MIN','MAX','REF','SIM','HOLD','DET','CONFU','CONFD','STU','STD','TB','CH'];
+    for(var i=0;i<keys.length;i++){
+      var k=keys[i];
+      if(d[k.toLowerCase()]!==undefined){
+        var el=document.createElement('div');
+        el.className='cfg-item';
+        el.innerHTML='<b>'+k+'</b> '+d[k.toLowerCase()];
+        g.appendChild(el);
+      }
+    }
+  }
+
+  window.toggleCfg=function(){
+    var t=document.getElementById('cfgToggle');
+    var b=document.getElementById('cfgBody');
+    t.classList.toggle('open');
+    b.classList.toggle('open');
+  };
+
+  connWS();
+})();
+</script>
+</body>
+</html>
