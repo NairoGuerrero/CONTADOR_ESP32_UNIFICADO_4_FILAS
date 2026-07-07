@@ -234,9 +234,11 @@ static void wifi_ap_stop(void) {
 
 static void task_diag_push(void *arg) {
     (void)arg;
+    esp_task_wdt_add(NULL);
     ESP_LOGI(TAG, "DIAG: Push task iniciada");
 
     while (diag_active) {
+        esp_task_wdt_reset();
         int64_t t = now_ms();
 
         if (dt_ms(t, diag_start_ms) >= DIAG_TIMEOUT_MS) {
@@ -325,6 +327,7 @@ static void task_diag_push(void *arg) {
         ESP_LOGI(TAG, "DIAG: Modo diagnóstico finalizado (timeout)");
     }
 
+    esp_task_wdt_delete(NULL);
     diag_push_handle = NULL;
     vTaskDelete(NULL);
 }

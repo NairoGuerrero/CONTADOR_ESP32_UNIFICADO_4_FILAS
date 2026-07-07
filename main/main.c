@@ -43,6 +43,7 @@ void app_main(void) {
     snprintf(diag_ssid, sizeof(diag_ssid), "CONTADOR_P%d", puerta_id);
 
     g_lock = xSemaphoreCreateMutex();
+    g_uart_tx_lock = xSemaphoreCreateMutex();
     config_load();
     gpio_init_all();
 
@@ -96,7 +97,7 @@ void app_main(void) {
 
     // Tasks solo P1
     if (puerta_id == 1) {
-        xTaskCreate(task_uart_peer, "uart_peer",   4096, NULL, 11, NULL);
+        xTaskCreate(task_uart_peer, "uart_peer",   6144, NULL, 11, NULL);
         xTaskCreate(task_report,    "report",      4096, NULL,  5, NULL);
     }
 

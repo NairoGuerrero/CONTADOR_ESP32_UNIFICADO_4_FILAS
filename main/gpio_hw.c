@@ -61,7 +61,7 @@ void uart_init_port(uart_port_t u, int tx, int rx) {
         .flow_ctrl  = UART_HW_FLOWCTRL_DISABLE,
         .source_clk = UART_SCLK_DEFAULT
     };
-    ESP_ERROR_CHECK(uart_driver_install(u, 2048, 0, 0, NULL, 0));
+    ESP_ERROR_CHECK(uart_driver_install(u, 2048, 512, 0, NULL, 0));
     ESP_ERROR_CHECK(uart_param_config(u, &cfg));
     ESP_ERROR_CHECK(uart_set_pin(u, tx, rx, UART_PIN_NO_CHANGE, UART_PIN_NO_CHANGE));
 }

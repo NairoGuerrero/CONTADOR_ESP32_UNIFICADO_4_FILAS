@@ -11,11 +11,13 @@
 extern int              puerta_id;      // 1=P1(delantera), 2=P2(trasera)
 extern config_t         g_cfg;
 extern SemaphoreHandle_t g_lock;
+extern SemaphoreHandle_t g_uart_tx_lock;
 extern const char       *TAG;
 
 // ── Funciones de configuración ──
 void     config_load(void);
 void     config_save(void);
+void     config_save_copy(const config_t *cfg);
 config_t default_config(void);
 void     apply_sanity(config_t *c);
 int      clamp_int(int v, int mn, int mx, int dv);

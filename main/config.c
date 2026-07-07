@@ -10,7 +10,8 @@
 // ── Definición de globals compartidos ──
 int               puerta_id = 1;
 config_t          g_cfg;
-SemaphoreHandle_t g_lock    = NULL;
+SemaphoreHandle_t g_lock        = NULL;
+SemaphoreHandle_t g_uart_tx_lock = NULL;
 const char       *TAG       = "P1";
 
 // ============================================================================
@@ -84,6 +85,17 @@ void config_save(void) {
         apply_sanity(&g_cfg);
         nvs_set_i32(h, "ver", CONFIG_VERSION);
         nvs_set_blob(h, "cfg", &g_cfg, sizeof(g_cfg));
+        nvs_commit(h);
+        nvs_close(h);
+    }
+}
+void config_save_copy(const config_t *cfg) {
+    config_t tmp = *cfg;
+    apply_sanity(&tmp);
+    nvs_handle_t h;
+    if (nvs_open("pcfg", NVS_READWRITE, &h) == ESP_OK) {
+        nvs_set_i32(h, "ver", CONFIG_VERSION);
+        nvs_set_blob(h, "cfg", &tmp, sizeof(tmp));
         nvs_commit(h);
         nvs_close(h);
     }

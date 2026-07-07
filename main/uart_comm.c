@@ -25,17 +25,23 @@ bool starts_with(const char *s, const char *pfx) {
 }
 
 void uart_write_line(uart_port_t u, const char *s) {
+    xSemaphoreTake(g_uart_tx_lock, portMAX_DELAY);
     uart_write_bytes(u, s, (int)strlen(s));
     uart_write_bytes(u, "\r\n", 2);
+    xSemaphoreGive(g_uart_tx_lock);
 }
 
 void uplink_post_ok(const char *msg, const char *tag_msg) {
-    const char *pfx = "AT$POST=1,2,";
-    uart_write_bytes(UART_UPLINK_NUM, pfx, (int)strlen(pfx));
-    if (tag_msg && tag_msg[0]) uart_write_bytes(UART_UPLINK_NUM, tag_msg, (int)strlen(tag_msg));
-    uart_write_bytes(UART_UPLINK_NUM, "+", 1);
-    if (msg && msg[0]) uart_write_bytes(UART_UPLINK_NUM, msg, (int)strlen(msg));
+    char buf[400];
+    int len = 0;
+    len += snprintf(buf + len, sizeof(buf) - len, "AT$POST=1,2,");
+    if (tag_msg && tag_msg[0]) len += snprintf(buf + len, sizeof(buf) - len, "%s", tag_msg);
+    len += snprintf(buf + len, sizeof(buf) - len, "+");
+    if (msg && msg[0]) len += snprintf(buf + len, sizeof(buf) - len, "%s", msg);
+    xSemaphoreTake(g_uart_tx_lock, portMAX_DELAY);
+    uart_write_bytes(UART_UPLINK_NUM, buf, len);
     uart_write_bytes(UART_UPLINK_NUM, "\r\n", 2);
+    xSemaphoreGive(g_uart_tx_lock);
 }
 
 void notificar_p1(const char *evento) {
@@ -55,16 +61,22 @@ void peer_send(const char *cmd) {
 static int  rtc_c_anio = 2000, rtc_c_mes = 1, rtc_c_dia = 1;
 static int  rtc_c_hora = 0, rtc_c_min = 0, rtc_c_seg = 0;
 static bool rtc_c_ok   = false;
+static SemaphoreHandle_t rtc_cache_lock = NULL;
 
 void rtc_update_cache(void) {
     if (puerta_id != 1) return;
+    if (rtc_cache_lock == NULL) rtc_cache_lock = xSemaphoreCreateMutex();
     int a, mo, d, h, mi, s;
     if (ds3231_leer_hora(&a, &mo, &d, &h, &mi, &s) == ESP_OK) {
+        xSemaphoreTake(rtc_cache_lock, portMAX_DELAY);
         rtc_c_anio = a; rtc_c_mes = mo; rtc_c_dia = d;
         rtc_c_hora = h; rtc_c_min = mi; rtc_c_seg = s;
         rtc_c_ok = true;
+        xSemaphoreGive(rtc_cache_lock);
     } else {
+        xSemaphoreTake(rtc_cache_lock, portMAX_DELAY);
         rtc_c_ok = false;
+        xSemaphoreGive(rtc_cache_lock);
     }
 }
 
@@ -82,7 +94,12 @@ void enviarDatos_locked(bool periodico) {
         id_envio = (unsigned)envio_id;
     }
 
-    if (!rtc_c_ok) {
+    xSemaphoreTake(rtc_cache_lock, portMAX_DELAY);
+    bool rtc_ok_local = rtc_c_ok;
+    int r_anio = rtc_c_anio, r_mes = rtc_c_mes, r_dia = rtc_c_dia;
+    int r_hora = rtc_c_hora, r_min = rtc_c_min, r_seg = rtc_c_seg;
+    xSemaphoreGive(rtc_cache_lock);
+    if (!rtc_ok_local) {
         snprintf(msg, sizeof(msg),
             "AT$POST=1,2,;22,00000000000000,%06u,%06u,%06u,%06u,%06u,%06u,%u",
             (unsigned)subida, (unsigned)bajada,
@@ -92,8 +109,8 @@ void enviarDatos_locked(bool periodico) {
     } else {
         snprintf(msg, sizeof(msg),
             "AT$POST=1,2,;22,%04d%02d%02d%02d%02d%02d,%06u,%06u,%06u,%06u,%06u,%06u,%u",
-            rtc_c_anio, rtc_c_mes, rtc_c_dia,
-            rtc_c_hora, rtc_c_min, rtc_c_seg,
+            r_anio, r_mes, r_dia,
+            r_hora, r_min, r_seg,
             (unsigned)subida, (unsigned)bajada,
             (unsigned)subidaP2, (unsigned)bajadaP2,
             (unsigned)bloqueos, (unsigned)bloqueosP2,
@@ -149,7 +166,11 @@ void procesarComando(const char *cmdline) {
     }
     if (strcmp(cmdReal, "@CCPUERTA-2") == 0) {
         puerta_id_save(2);
-        g_cfg.ptrasera = 0; config_save();
+        xSemaphoreTake(g_lock, portMAX_DELAY);
+        g_cfg.ptrasera = 0;
+        config_t cfg_cpy = g_cfg;
+        xSemaphoreGive(g_lock);
+        config_save_copy(&cfg_cpy);
         uplink_post_ok("@RC OK+PUERTA=2 REBOOT", ts);
         ESP_LOGI(TAG, "PUERTA configurada a P2 — requiere reboot");
         vTaskDelay(pdMS_TO_TICKS(100));
@@ -252,11 +273,13 @@ void procesarComando(const char *cmdline) {
                     SAMPLES_PER_READ, MIX_EPS_MS);
             }
             xSemaphoreGive(g_lock);
+            xSemaphoreTake(g_uart_tx_lock, portMAX_DELAY);
             uart_write_bytes(UART_UPLINK_NUM, "AT$POST=1,2,", 12);
             if (ts[0]) uart_write_bytes(UART_UPLINK_NUM, ts, (int)strlen(ts));
             uart_write_bytes(UART_UPLINK_NUM, "+@RC OK+", 8);
             uart_write_bytes(UART_UPLINK_NUM, b, (int)strlen(b));
             uart_write_bytes(UART_UPLINK_NUM, "\r\n", 2);
+            xSemaphoreGive(g_uart_tx_lock);
             return;
         }
     }
@@ -268,8 +291,10 @@ void procesarComando(const char *cmdline) {
             (cmdReal[strlen(cam_pfx)] == '2' || cmdReal[strlen(cam_pfx)] == '3')) {
             int v = cmdReal[strlen(cam_pfx)] - '0';
             xSemaphoreTake(g_lock, portMAX_DELAY);
-            g_cfg.cam = v; config_save();
+            g_cfg.cam = v;
+            config_t cfg_cpy = g_cfg;
             xSemaphoreGive(g_lock);
+            config_save_copy(&cfg_cpy);
             char b[64]; snprintf(b, sizeof(b), "@RC OK+CAM%c=%d", my_sfx, v);
             uplink_post_ok(b, ts); return;
         }
@@ -278,11 +303,13 @@ void procesarComando(const char *cmdline) {
     // -- PUERTA TRASERA (P1 ONLY) --
     
     if (puerta_id == 1) {
-		if (starts_with(cmdReal, "@CCPTRASERA") && (cmdReal[12] == '1' || cmdReal[12] == '0')){
+		if (strcmp(cmdReal, "@CCPTRASERA-1") == 0 || strcmp(cmdReal, "@CCPTRASERA-0") == 0) {
 			int v = cmdReal[12] - '0';
 			xSemaphoreTake(g_lock, portMAX_DELAY);
-			g_cfg.ptrasera = v; config_save();
+			g_cfg.ptrasera = v;
+			config_t cfg_cpy = g_cfg;
 			xSemaphoreGive(g_lock);
+			config_save_copy(&cfg_cpy);
 			char b[64]; snprintf(b, sizeof(b), "@RC OK+PTRASERA=%d", v);
             uplink_post_ok(b, ts); return;
 		}
@@ -295,17 +322,21 @@ void procesarComando(const char *cmdline) {
         snprintf(ch_off, sizeof(ch_off), "@CCCH%c-OFF", my_sfx);
         if (strcmp(cmdReal, ch_on) == 0) {
             xSemaphoreTake(g_lock, portMAX_DELAY);
-            g_cfg.ch = 1; config_save();
+            g_cfg.ch = 1;
             if (alarmaBloqueoActiva) gpio_set_level(PIN_CH, 1);
+            config_t cfg_cpy = g_cfg;
             xSemaphoreGive(g_lock);
+            config_save_copy(&cfg_cpy);
             char b[32]; snprintf(b, sizeof(b), "@RC OK+CH%c-ON", my_sfx);
             uplink_post_ok(b, ts); return;
         }
         if (strcmp(cmdReal, ch_off) == 0) {
             xSemaphoreTake(g_lock, portMAX_DELAY);
-            g_cfg.ch = 0; config_save();
+            g_cfg.ch = 0;
             gpio_set_level(PIN_CH, 0);
+            config_t cfg_cpy = g_cfg;
             xSemaphoreGive(g_lock);
+            config_save_copy(&cfg_cpy);
             char b[32]; snprintf(b, sizeof(b), "@RC OK+CH%c-OFF", my_sfx);
             uplink_post_ok(b, ts); return;
         }
@@ -318,8 +349,10 @@ void procesarComando(const char *cmdline) {
             int seg = atoi(cmdReal + strlen(tb_pfx));
             if (seg >= MIN_TB_S && seg <= MAX_TB_S) {
                 xSemaphoreTake(g_lock, portMAX_DELAY);
-                g_cfg.tb_s = seg; config_save();
+                g_cfg.tb_s = seg;
+                config_t cfg_cpy = g_cfg;
                 xSemaphoreGive(g_lock);
+                config_save_copy(&cfg_cpy);
                 char b[64]; snprintf(b, sizeof(b), "@RC OK+TB%c=%d", my_sfx, seg);
                 uplink_post_ok(b, ts);
             } else {
@@ -358,8 +391,10 @@ void procesarComando(const char *cmdline) {
             else if (!strcmp(key,"CONFD") && v>=MIN_CONF   && v<=MAX_CONF)   { g_cfg.CONFD=v; ok=true; }
             else if (!strcmp(key,"STU")   && v>=MIN_STREAK && v<=MAX_STREAK) { g_cfg.STU=v;   ok=true; }
             else if (!strcmp(key,"STD")   && v>=MIN_STREAK && v<=MAX_STREAK) { g_cfg.STD=v;   ok=true; }
-            if (ok) config_save();
+            config_t cfg_cpy;
+            if (ok) cfg_cpy = g_cfg;
             xSemaphoreGive(g_lock);
+            if (ok) config_save_copy(&cfg_cpy);
 
             if (ok) {
                 char b[120]; snprintf(b, sizeof(b), "@RC OK+CFG%c-%s=%d", my_sfx, key, v);
