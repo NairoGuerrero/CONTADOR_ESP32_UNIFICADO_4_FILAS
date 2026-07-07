@@ -72,10 +72,10 @@ void app_main(void) {
         PIN_CH, PIN_DIAG_BTN);
     ESP_LOGI(TAG, "CFG,LS=%d,MIN=%d,MAX=%d,REF=%d,SIM=%d,HOLD=%d,"
                   "DET=%d,CONFU=%d,CONFD=%d,STU=%d,STD=%d,"
-                  "TB=%d,CAM=%d,CH=%d,EPS=%d",
+                  "TB=%d,CAM=%d,CH=%d,EPS=%d,PT?=%d",
         g_cfg.LS, g_cfg.MIN, g_cfg.MAX, g_cfg.REF, g_cfg.SIM, g_cfg.HOLD,
         g_cfg.DET, g_cfg.CONFU, g_cfg.CONFD, g_cfg.STU, g_cfg.STD,
-        g_cfg.tb_s, g_cfg.cam, g_cfg.ch, MIX_EPS_MS);
+        g_cfg.tb_s, g_cfg.cam, g_cfg.ch, MIX_EPS_MS, g_cfg.ptrasera);
 
     // Log RTC (P1 only)
     if (puerta_id == 1 && rtc_initialized) {

@@ -155,6 +155,7 @@ typedef struct {
     int LS, MIN, MAX, REF, SIM;
     int DET, CONFU, CONFD, STU, STD;
     int HOLD;
+    int ptrasera;
 } config_t;
 
 // ============================================================================

@@ -14,6 +14,7 @@
 #include "esp_log.h"
 #include "esp_system.h"
 #include "esp_task_wdt.h"
+#include <string.h>
 
 // ============================================================================
 //  Helpers
@@ -108,6 +109,8 @@ void enviarDatos_locked(bool periodico) {
 
 void procesarComando(const char *cmdline) {
     if (!cmdline) return;
+    ESP_LOGI(TAG, "CMD=%s", cmdline );
+    if (starts_with(cmdline, "@P")) return;
     if (strncmp(cmdline, "$ERROR", 6) == 0) return;
     if (strncmp(cmdline, "$OK",    3) == 0) return;
 
@@ -146,6 +149,7 @@ void procesarComando(const char *cmdline) {
     }
     if (strcmp(cmdReal, "@CCPUERTA-2") == 0) {
         puerta_id_save(2);
+        g_cfg.ptrasera = 0; config_save();
         uplink_post_ok("@RC OK+PUERTA=2 REBOOT", ts);
         ESP_LOGI(TAG, "PUERTA configurada a P2 — requiere reboot");
         vTaskDelay(pdMS_TO_TICKS(100));
@@ -155,7 +159,7 @@ void procesarComando(const char *cmdline) {
 
     // ── PUERTA? ──
     if (strcmp(cmdReal, "@CCPUERTA?") == 0) {
-        char b[64]; snprintf(b, sizeof(b), "@RC OK+PUERTA=%d", puerta_id);
+        char b[64]; snprintf(b, sizeof(b), "@RC OK+PUERTA=%d,%d", puerta_id,g_cfg.ptrasera);
         uplink_post_ok(b, ts);
         return;
     }
@@ -230,12 +234,12 @@ void procesarComando(const char *cmdline) {
                 snprintf(b, sizeof(b),
                     "CFG%c:LS=%d,MIN=%d,MAX=%d,REF=%d,SIM=%d,HOLD=%d,"
                     "DET=%d,CONFU=%d,CONFD=%d,STU=%d,STD=%d,"
-                    "TB=%d,CAM=%d,CH=%d,SAMP=%d,EPS=%d",
+                    "TB=%d,CAM=%d,CH=%d,SAMP=%d,EPS=%d,PT?=%d",
                     my_sfx,
                     g_cfg.LS, g_cfg.MIN, g_cfg.MAX, g_cfg.REF, g_cfg.SIM, g_cfg.HOLD,
                     g_cfg.DET, g_cfg.CONFU, g_cfg.CONFD, g_cfg.STU, g_cfg.STD,
                     g_cfg.tb_s, g_cfg.cam, g_cfg.ch,
-                    SAMPLES_PER_READ, MIX_EPS_MS);
+                    SAMPLES_PER_READ, MIX_EPS_MS, g_cfg.ptrasera);
             } else {
                 snprintf(b, sizeof(b),
                     "CFG%c:LS=%d,MIN=%d,MAX=%d,REF=%d,SIM=%d,HOLD=%d,"
@@ -270,6 +274,19 @@ void procesarComando(const char *cmdline) {
             uplink_post_ok(b, ts); return;
         }
     }
+    
+    // -- PUERTA TRASERA (P1 ONLY) --
+    
+    if (puerta_id == 1) {
+		if (starts_with(cmdReal, "@CCPTRASERA") && (cmdReal[12] == '1' || cmdReal[12] == '0')){
+			int v = cmdReal[12] - '0';
+			xSemaphoreTake(g_lock, portMAX_DELAY);
+			g_cfg.ptrasera = v; config_save();
+			xSemaphoreGive(g_lock);
+			char b[64]; snprintf(b, sizeof(b), "@RC OK+PTRASERA=%d", v);
+            uplink_post_ok(b, ts); return;
+		}
+	}
 
     // ── CH ──
     {

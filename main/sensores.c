@@ -124,7 +124,11 @@ static void enviarBloqueo_locked(void) {
     } else if (puerta_id == 1) {
         if (contadorBloqueos <= 3) {
             char b[64];
-            snprintf(b, sizeof(b), "AT$GCAM=%d,0", g_cfg.cam);
+            if (g_cfg.ptrasera){
+				snprintf(b, sizeof(b), "AT$GCAM=0,%d", g_cfg.cam);
+			}else{
+				snprintf(b, sizeof(b), "AT$GCAM=%d,0", g_cfg.cam);
+			}
             uart_write_line(UART_UPLINK_NUM, b);
         } else if (contadorBloqueos >= 50) {
             contadorBloqueos = 0;
@@ -151,7 +155,16 @@ static void registrarConteo_locked(bool es_subida) {
                  tipo, (unsigned)(es_subida ? diag_sub : diag_baj),
                  (long long)tUltimoConteo);
     } else if (puerta_id == 1) {
-        if (es_subida) subida++; else bajada++;
+        if (es_subida){
+			if (g_cfg.ptrasera){
+				char b[64];
+				snprintf(b, sizeof(b), "AT$GCAM=0,%d", g_cfg.cam);
+				uart_write_line(UART_UPLINK_NUM, b); 
+			} 
+			subida++;
+        }else {
+			bajada++;
+        }
         ESP_LOGI(TAG, "COUNT,type=%s,sub=%u,dn=%u,t=%lld",
                  tipo, (unsigned)subida, (unsigned)bajada,
                  (long long)tUltimoConteo);

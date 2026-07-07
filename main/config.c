@@ -28,7 +28,8 @@ config_t default_config(void) {
         .LS   = DEF_LS,  .MIN  = DEF_MIN,  .MAX  = DEF_MAX,
         .REF  = DEF_REF, .SIM  = DEF_SIM,
         .DET  = DEF_DET, .CONFU= DEF_CONFU,.CONFD= DEF_CONFD,
-        .STU  = DEF_STU, .STD  = DEF_STD,  .HOLD = DEF_HOLD
+        .STU  = DEF_STU, .STD  = DEF_STD,  .HOLD = DEF_HOLD,
+        .ptrasera = 0
     };
 }
 
@@ -47,6 +48,7 @@ void apply_sanity(config_t *c) {
     c->STU   = clamp_int(c->STU,  MIN_STREAK,MAX_STREAK,DEF_STU);
     c->STD   = clamp_int(c->STD,  MIN_STREAK,MAX_STREAK,DEF_STD);
     c->HOLD  = clamp_int(c->HOLD, MIN_HOLD, MAX_HOLD, DEF_HOLD);
+    if (c->ptrasera != 1 && c->ptrasera != 0) c->ptrasera = 0;
 }
 
 // ============================================================================
