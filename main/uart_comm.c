@@ -101,14 +101,14 @@ void enviarDatos_locked(bool periodico) {
     xSemaphoreGive(rtc_cache_lock);
     if (!rtc_ok_local) {
         snprintf(msg, sizeof(msg),
-            "AT$POST=1,2,;22,00000000000000,%06u,%06u,%06u,%06u,%06u,%06u,%u",
+            "AT$POST=1,2,;22,00000000000000,%06u,%06u,%06u,%06u,%06u,%06u,%u,",
             (unsigned)subida, (unsigned)bajada,
             (unsigned)subidaP2, (unsigned)bajadaP2,
             (unsigned)bloqueos, (unsigned)bloqueosP2,
             id_envio);
     } else {
         snprintf(msg, sizeof(msg),
-            "AT$POST=1,2,;22,%04d%02d%02d%02d%02d%02d,%06u,%06u,%06u,%06u,%06u,%06u,%u",
+            "AT$POST=1,2,;22,%04d%02d%02d%02d%02d%02d,%06u,%06u,%06u,%06u,%06u,%06u,%u,",
             r_anio, r_mes, r_dia,
             r_hora, r_min, r_seg,
             (unsigned)subida, (unsigned)bajada,
@@ -180,7 +180,7 @@ void procesarComando(const char *cmdline) {
 
     // ── PUERTA? ──
     if (strcmp(cmdReal, "@CCPUERTA?") == 0) {
-        char b[64]; snprintf(b, sizeof(b), "@RC OK+PUERTA=%d,%d", puerta_id,g_cfg.ptrasera);
+        char b[64]; snprintf(b, sizeof(b), "@RC OK+PUERTA=%d,%d,", puerta_id,g_cfg.ptrasera);
         uplink_post_ok(b, ts);
         return;
     }
@@ -239,12 +239,12 @@ void procesarComando(const char *cmdline) {
         if (strcmp(cmdReal, reboot_cmd) == 0) {
             char b[32]; snprintf(b, sizeof(b), "@RC OK+REBOOT-%c", my_sfx);
             uplink_post_ok(b, ts);
+            uart_wait_tx_done(UART_NUM_1, pdMS_TO_TICKS(500));
             vTaskDelay(pdMS_TO_TICKS(50));
             esp_restart();
             return;
         }
     }
-
     // ── CFG? ──
     {
         char cfg_cmd[16]; snprintf(cfg_cmd, sizeof(cfg_cmd), "@CCCFG%c?", my_sfx);
@@ -255,7 +255,7 @@ void procesarComando(const char *cmdline) {
                 snprintf(b, sizeof(b),
                     "CFG%c:LS=%d,MIN=%d,MAX=%d,REF=%d,SIM=%d,HOLD=%d,"
                     "DET=%d,CONFU=%d,CONFD=%d,STU=%d,STD=%d,"
-                    "TB=%d,CAM=%d,CH=%d,SAMP=%d,EPS=%d,PT?=%d",
+                    "TB=%d,CAM=%d,CH=%d,SAMP=%d,EPS=%d,PT?=%d,",
                     my_sfx,
                     g_cfg.LS, g_cfg.MIN, g_cfg.MAX, g_cfg.REF, g_cfg.SIM, g_cfg.HOLD,
                     g_cfg.DET, g_cfg.CONFU, g_cfg.CONFD, g_cfg.STU, g_cfg.STD,
@@ -265,7 +265,7 @@ void procesarComando(const char *cmdline) {
                 snprintf(b, sizeof(b),
                     "CFG%c:LS=%d,MIN=%d,MAX=%d,REF=%d,SIM=%d,HOLD=%d,"
                     "DET=%d,CONFU=%d,CONFD=%d,STU=%d,STD=%d,"
-                    "TB=%d,CH=%d,SAMP=%d,EPS=%d",
+                    "TB=%d,CH=%d,SAMP=%d,EPS=%d,",
                     my_sfx,
                     g_cfg.LS, g_cfg.MIN, g_cfg.MAX, g_cfg.REF, g_cfg.SIM, g_cfg.HOLD,
                     g_cfg.DET, g_cfg.CONFU, g_cfg.CONFD, g_cfg.STU, g_cfg.STD,
